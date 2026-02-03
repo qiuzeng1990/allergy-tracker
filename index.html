@@ -15,6 +15,54 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    // Provide a small async storage shim if `window.storage` isn't provided by the host
+    // This mirrors the minimal API used by the app: get(key), set(key, value), delete(key), list(prefix)
+    if (!window.storage) {
+      window.storage = {
+        async get(key) {
+          try {
+            const v = localStorage.getItem(key);
+            if (v === null) return undefined;
+            return { value: v };
+          } catch (e) {
+            console.error('storage.get error', e);
+            throw e;
+          }
+        },
+        async set(key, value) {
+          try {
+            localStorage.setItem(key, value);
+            return { success: true };
+          } catch (e) {
+            console.error('storage.set error', e);
+            throw e;
+          }
+        },
+        async delete(key) {
+          try {
+            localStorage.removeItem(key);
+            return { success: true };
+          } catch (e) {
+            console.error('storage.delete error', e);
+            throw e;
+          }
+        },
+        async list(prefix) {
+          try {
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.indexOf(prefix) === 0) keys.push(k);
+            }
+            return { keys };
+          } catch (e) {
+            console.error('storage.list error', e);
+            throw e;
+          }
+        }
+      };
+    }
+
     function AllergyTracker() {
       const [view, setView] = useState('log');
       const [entries, setEntries] = useState([]);
@@ -70,16 +118,26 @@
 
       const saveApiKeys = async () => {
         try {
+          if (!window.storage) throw new Error('No storage available');
+
+          // Save or remove keys explicitly so empty values clear previous keys
           if (apiKeys.weather) {
             await window.storage.set('api-key-weather', apiKeys.weather);
+          } else {
+            try { await window.storage.delete('api-key-weather'); } catch (e) { /* ignore */ }
           }
+
           if (apiKeys.pollen) {
             await window.storage.set('api-key-pollen', apiKeys.pollen);
+          } else {
+            try { await window.storage.delete('api-key-pollen'); } catch (e) { /* ignore */ }
           }
+
           setShowApiSetup(false);
           alert('API keys saved! You can now fetch weather and pollen data automatically.');
         } catch (error) {
-          alert('Failed to save API keys');
+          console.error('Failed to save API keys', error);
+          alert('Failed to save API keys: ' + (error?.message || error));
         }
       };
 
