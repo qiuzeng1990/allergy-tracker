@@ -190,7 +190,10 @@
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
       const [isSignUp, setIsSignUp] = useState(false);
-      const [autoFetchStatus, setAutoFetchStatus] = useState({ weather: null, pollen: null });
+      const [autoFetchStatus, setAutoFetchStatus] = useState({ 
+        weather: { type: null, timestamp: null }, 
+        pollen: { type: null, timestamp: null } 
+      });
       
       // Form state
       const [formData, setFormData] = useState({
@@ -256,10 +259,10 @@
             // Wait a bit for the component to be ready
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            if (apiKeys.weather && !formData.weather.temperature) {
+            if (apiKeys.weather && !formData.weather.temperature && !autoFetchStatus.weather.type) {
               await fetchWeatherData(true);
             }
-            if (apiKeys.pollen) {
+            if (apiKeys.pollen && !autoFetchStatus.pollen.type) {
               // Check if pollen data hasn't been fetched yet (all values are 0)
               const hasPollenData = Object.values(formData.pollen).some(v => v > 0);
               if (!hasPollenData) {
@@ -271,6 +274,16 @@
           autoFetch();
         }
       }, [apiKeys]);
+
+      // Auto-refresh timestamp display every minute
+      useEffect(() => {
+        const interval = setInterval(() => {
+          // Force re-render to update "X mins ago" display
+          setAutoFetchStatus(prev => ({ ...prev }));
+        }, 60000); // Update every minute
+        
+        return () => clearInterval(interval);
+      }, []);
 
       const signInWithEmail = async () => {
         if (!firebaseEnabled) {
@@ -456,7 +469,10 @@
             }
           }));
           
-          setAutoFetchStatus(prev => ({ ...prev, weather: isAuto ? 'auto' : 'manual' }));
+          setAutoFetchStatus(prev => ({ 
+            ...prev, 
+            weather: { type: isAuto ? 'auto' : 'manual', timestamp: new Date() }
+          }));
           
           if (!isAuto) alert('Weather data fetched successfully!');
         } catch (error) {
@@ -554,7 +570,10 @@
             pollen: pollenData
           }));
           
-          setAutoFetchStatus(prev => ({ ...prev, pollen: isAuto ? 'auto' : 'manual' }));
+          setAutoFetchStatus(prev => ({ 
+            ...prev, 
+            pollen: { type: isAuto ? 'auto' : 'manual', timestamp: new Date() }
+          }));
           
           if (!isAuto) alert('Pollen data fetched successfully!');
         } catch (error) {
@@ -655,7 +674,7 @@
           ...prev,
           weather: { temperature: '', condition: 'sunny', humidity: '' }
         }));
-        setAutoFetchStatus(prev => ({ ...prev, weather: null }));
+        setAutoFetchStatus(prev => ({ ...prev, weather: { type: null, timestamp: null } }));
       };
 
       const clearPollen = () => {
@@ -669,7 +688,7 @@
             mold: 0
           }
         }));
-        setAutoFetchStatus(prev => ({ ...prev, pollen: null }));
+        setAutoFetchStatus(prev => ({ ...prev, pollen: { type: null, timestamp: null } }));
       };
 
       const getSeverityColor = (value) => {
@@ -683,6 +702,26 @@
       const getSeverityLabel = (value) => {
         const labels = ['None', 'Mild', 'Moderate', 'Severe', 'Very Severe'];
         return labels[value] || 'None';
+      };
+
+      const formatFetchTime = (timestamp) => {
+        if (!timestamp) return '';
+        
+        const now = new Date();
+        const diffMs = now - timestamp;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+        
+        // For older data, show the actual time
+        return timestamp.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        });
       };
 
       if (loading) {
@@ -936,9 +975,11 @@
                         ⚠️ Add weather API key in "API Setup" to enable auto-fetch
                       </p>
                     )}
-                    {autoFetchStatus.weather && (
+                    {autoFetchStatus.weather.type && (
                       <p className="text-xs text-green-600 mb-2">
-                        ✓ {autoFetchStatus.weather === 'auto' ? 'Auto-fetched on page load' : 'Manually fetched'}
+                        ✓ {autoFetchStatus.weather.type === 'auto' ? 'Auto-fetched' : 'Manually fetched'}
+                        {' • '}
+                        {formatFetchTime(autoFetchStatus.weather.timestamp)}
                       </p>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1010,9 +1051,11 @@
                         ⚠️ Add Google Pollen API key in "API Setup" to enable auto-fetch (100% FREE!)
                       </p>
                     )}
-                    {autoFetchStatus.pollen && (
+                    {autoFetchStatus.pollen.type && (
                       <p className="text-xs text-green-600 mb-2">
-                        ✓ {autoFetchStatus.pollen === 'auto' ? 'Auto-fetched on page load' : 'Manually fetched'}
+                        ✓ {autoFetchStatus.pollen.type === 'auto' ? 'Auto-fetched' : 'Manually fetched'}
+                        {' • '}
+                        {formatFetchTime(autoFetchStatus.pollen.timestamp)}
                       </p>
                     )}
                     
