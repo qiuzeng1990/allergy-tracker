@@ -25,15 +25,15 @@
     // ============================================
     // REPLACE THESE with your own Firebase config from Firebase Console
     // Get these values from: Firebase Console > Project Settings > Your apps > Web app
-  const firebaseConfig = {
-  apiKey: "AIzaSyBKDmUQIH4liJGo6nZnUMWTVNw_PtZpgG8",
-  authDomain: "allergy-tracker-8325a.firebaseapp.com",
-  projectId: "allergy-tracker-8325a",
-  storageBucket: "allergy-tracker-8325a.firebasestorage.app",
-  messagingSenderId: "768176741527",
-  appId: "1:768176741527:web:1de06a2df5f92a0ea71dd2",
-  measurementId: "G-Y95CH004YH"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyBKDmUQIH4liJGo6nZnUMWTVNw_PtZpgG8",
+      authDomain: "allergy-tracker-8325a.firebaseapp.com",
+      projectId: "allergy-tracker-8325a",
+      storageBucket: "allergy-tracker-8325a.firebasestorage.app",
+      messagingSenderId: "768176741527",
+      appId: "1:768176741527:web:1de06a2df5f92a0ea71dd2",
+      measurementId: "G-Y95CH004YH"
+    };
 
     // Initialize Firebase (only if config is set)
     let db = null;
@@ -169,6 +169,15 @@
     };
 
     function AllergyTracker() {
+      // Helper function to get today's date in local timezone as YYYY-MM-DD
+      const getTodayLocal = () => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
       const [view, setView] = useState('log');
       const [entries, setEntries] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -185,7 +194,7 @@
       
       // Form state
       const [formData, setFormData] = useState({
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayLocal(),
         symptoms: {
           sneezing: 0,
           runnyNose: 0,
@@ -568,14 +577,27 @@
         };
 
         try {
+          // Delete any existing entries for this date
+          const existingEntries = entries.filter(e => e.date === formData.date);
+          for (const oldEntry of existingEntries) {
+            try {
+              await storage.delete(`allergy-entry:${oldEntry.id}`, true);
+            } catch (e) {
+              console.log('Could not delete old entry:', e);
+            }
+          }
+
+          // Save new entry
           await storage.set(`allergy-entry:${entry.id}`, JSON.stringify(entry), true);
-          setEntries(prev => [entry, ...prev.filter(e => e.id !== entry.id)].sort((a, b) => 
+          
+          // Update local state - remove old entries for this date and add new one
+          setEntries(prev => [entry, ...prev.filter(e => e.date !== formData.date)].sort((a, b) => 
             new Date(b.date) - new Date(a.date)
           ));
           
           // Reset form
           setFormData({
-            date: new Date().toISOString().split('T')[0],
+            date: getTodayLocal(),
             symptoms: {
               sneezing: 0,
               runnyNose: 0,
