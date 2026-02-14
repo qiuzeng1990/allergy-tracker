@@ -689,21 +689,10 @@
             new Date(b.date) - new Date(a.date)
           ));
           
-          // Reset form - keep weather, pollen, and location data, only reset symptoms
+          // Keep ALL data after saving - only reset date to today
           setFormData(prev => ({
-            date: getTodayLocal(),
-            location: prev.location, // Keep location
-            symptoms: {
-              sneezing: 0,
-              runnyNose: 0,
-              itchyEyes: 0,
-              congestion: 0,
-              cough: 0,
-              headache: 0
-            },
-            weather: prev.weather, // Keep weather data
-            pollen: prev.pollen, // Keep pollen data
-            notes: ''
+            ...prev,
+            date: getTodayLocal()
           }));
           
           // Don't reset autoFetchStatus so indicators remain
